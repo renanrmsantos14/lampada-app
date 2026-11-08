@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# chaves e dados locais da lâmpada (nunca versionar)
+*.keystore
+devices.json
+snapshot.json
+tinytuya.json
+tuya-raw.json

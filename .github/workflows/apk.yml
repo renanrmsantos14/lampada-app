@@ -1,0 +1,63 @@
+name: APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+
+      # Versão própria: 0.0.<número do build>, data/hora em America/Sao_Paulo.
+      - name: Versão
+        id: ver
+        run: |
+          VERSION="0.0.${{ github.run_number }}"
+          DATE="$(TZ=America/Sao_Paulo date '+%d/%m/%Y %H:%M')"
+          echo "export const BUILD = { version: '$VERSION', date: '$DATE' };" > src/build-info.ts
+          node -e "const f='app.json',a=require('./'+f);a.expo.version='$VERSION';a.expo.android.versionCode=${{ github.run_number }};require('fs').writeFileSync(f,JSON.stringify(a,null,2))"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+
+      - run: pnpm exec expo prebuild --platform android --no-install
+      - run: ./gradlew assembleRelease --no-daemon -q
+        working-directory: android
+
+      # Assinatura fixa (secret) para o celular aceitar atualizações sem desinstalar.
+      - name: Assinar
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$APKSIGNER" sign --ks "$RUNNER_TEMP/release.p12" --ks-type PKCS12 --ks-key-alias lampada \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --out "lampada-v${{ steps.ver.outputs.version }}.apk" android/app/build/outputs/apk/release/app-release.apk
+          "$APKSIGNER" verify "lampada-v${{ steps.ver.outputs.version }}.apk"
+          rm "$RUNNER_TEMP/release.p12"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Lâmpada v${{ steps.ver.outputs.version }} · ${{ steps.ver.outputs.date }}
+          body: APK gerado a partir de ${{ github.sha }}. Instale no Android e configure ID, IP e chave local na primeira abertura.
+          files: lampada-v${{ steps.ver.outputs.version }}.apk
