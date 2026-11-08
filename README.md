@@ -9,6 +9,7 @@ App Android open source (React Native + Expo) que controla lâmpadas Tuya, como 
 
 ## Instalar
 1. Baixe o APK mais recente em **[Releases](../../releases)** e instale. O Android vai pedir para permitir a instalação de fontes desconhecidas. O APK é só para celulares ARM 64 bits (praticamente todos desde 2017).
+3. Atualizações: o app procura versão nova no GitHub ao abrir e mostra um aviso. Em **Ajustes → Atualizações** dá para procurar de novo e tocar em **Baixar e instalar**. Na primeira vez, o Android pede para permitir instalar apps desta fonte.
 2. Na primeira abertura, informe o **ID**, o **IP** e a **chave local** da lâmpada (veja abaixo). O app testa a conexão antes de salvar.
 
 ## Obter ID, IP e chave local (feito uma vez)
