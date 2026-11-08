@@ -8,7 +8,7 @@ App Android open source (React Native + Expo) que controla lâmpadas Tuya, como 
 - A chave local fica guardada só no celular (`expo-secure-store`); nada sensível vai para o repositório nem para o APK
 
 ## Instalar
-1. Baixe o APK mais recente em **[Releases](../../releases)** e instale. O Android vai pedir para permitir a instalação de fontes desconhecidas.
+1. Baixe o APK mais recente em **[Releases](../../releases)** e instale. O Android vai pedir para permitir a instalação de fontes desconhecidas. O APK é só para celulares ARM 64 bits (praticamente todos desde 2017).
 2. Na primeira abertura, informe o **ID**, o **IP** e a **chave local** da lâmpada (veja abaixo). O app testa a conexão antes de salvar.
 
 ## Obter ID, IP e chave local (feito uma vez)
@@ -34,7 +34,7 @@ node scripts/testar-lampada.mjs caminho/devices.json   # testa o protocolo contr
 - O socket TCP usa `react-native-tcp-socket`, por isso o app **não roda no Expo Go**: é preciso gerar o APK.
 
 ## Build
-Cada push na `main` dispara o GitHub Actions (`.github/workflows/apk.yml`), que gera o APK `v0.0.<build>` e o publica em Releases. A assinatura usa os secrets `KEYSTORE_BASE64` e `KEYSTORE_PASSWORD` (keystore PKCS12, alias `lampada`), o que permite atualizar o app sem desinstalar.
+Cada push na `main` dispara o GitHub Actions (`.github/workflows/apk.yml`), que gera o APK `v0.0.<build>` e o publica em Releases. A assinatura usa os secrets `KEYSTORE_BASE64` e `KEYSTORE_PASSWORD` (keystore PKCS12, alias `lampada`), o que permite atualizar o app sem desinstalar. O build gera só `arm64-v8a` e usa cache do Gradle para ficar mais rápido.
 
 Suporte atual: lâmpadas Tuya versão **3.3** com DPs 20–24 (tipo B). Versões 3.4 e 3.5 do protocolo ainda não são suportadas.
 

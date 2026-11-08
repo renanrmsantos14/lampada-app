@@ -22,6 +22,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      # Cache de dependências e saídas do Gradle entre builds.
+      - uses: gradle/actions/setup-gradle@v4
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc --noEmit
@@ -38,7 +40,8 @@ jobs:
           echo "date=$DATE" >> "$GITHUB_OUTPUT"
 
       - run: pnpm exec expo prebuild --platform android --no-install
-      - run: ./gradlew assembleRelease --no-daemon -q
+      # Só arm64-v8a (celulares atuais): metade do tempo de build e APK menor.
+      - run: ./gradlew assembleRelease -q -PreactNativeArchitectures=arm64-v8a
         working-directory: android
 
       # Assinatura fixa (secret) para o celular aceitar atualizações sem desinstalar.
