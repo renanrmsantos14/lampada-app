@@ -4,7 +4,7 @@ import { BUILD } from './build-info';
 import { connect } from './connect';
 import { saveDevice } from './device-store';
 import { colors, radius } from './theme';
-import { Bulb, type Device } from './tuya';
+import { Bulb, findBulb, type Device } from './tuya';
 import { REPO, type Release, type UpdateState } from './updater';
 
 type Props = {
@@ -42,7 +42,13 @@ export function Settings({ initial, onSaved, onBack, update, onCheck, onInstall 
       await saveDevice(form);
       onSaved(form);
     } catch (e) {
-      setError(`Não consegui falar com a lâmpada: ${(e as Error).message}`);
+      // IP antigo? Procura a lâmpada na mesma rede antes de desistir.
+      setError('Procurando a lâmpada na rede…');
+      const found = await findBulb(connect, form).catch(() => null);
+      if (found) {
+        await saveDevice(found);
+        onSaved(found);
+      } else setError(`Não consegui falar com a lâmpada: ${(e as Error).message}`);
     } finally {
       bulb.close();
       setTesting(false);

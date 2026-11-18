@@ -6,10 +6,10 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Bar } from './src/Bar';
 import { BUILD } from './src/build-info';
 import { connect } from './src/connect';
-import { loadDevice } from './src/device-store';
+import { loadDevice, saveDevice } from './src/device-store';
 import { Settings } from './src/Settings';
 import { colors, HUE_STOPS, hsvToHex, radius, textOn, whiteTone, WARM, COOL } from './src/theme';
-import { Bulb, commands, type BulbState, type Device } from './src/tuya';
+import { Bulb, commands, findBulb, type BulbState, type Device } from './src/tuya';
 import { useUpdater, type Release } from './src/updater';
 
 const THROTTLE_MS = 120;
@@ -65,6 +65,7 @@ export default function App() {
               update={available}
               onUpdate={() => setEditing(true)}
               onEdit={() => setEditing(true)}
+              onMoved={(d) => saveDevice(d).finally(() => setDevice(d))}
             />
           )}
           <Text style={styles.version} pointerEvents="none">
@@ -76,9 +77,15 @@ export default function App() {
   );
 }
 
-type ControlProps = { device: Device; update: Release | null; onUpdate: () => void; onEdit: () => void };
+type ControlProps = {
+  device: Device;
+  update: Release | null;
+  onUpdate: () => void;
+  onEdit: () => void;
+  onMoved: (device: Device) => void; // lâmpada achada em outro IP
+};
 
-function Control({ device, update, onUpdate, onEdit }: ControlProps) {
+function Control({ device, update, onUpdate, onEdit, onMoved }: ControlProps) {
   const [bulb] = useState(() => new Bulb(connect, device));
   const [state, setState] = useState<BulbState | null>(null);
   const [error, setError] = useState('');
@@ -86,6 +93,19 @@ function Control({ device, update, onUpdate, onEdit }: ControlProps) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const retry = useRef<{ attempt: number; timer: ReturnType<typeof setTimeout> | null }>({ attempt: 0, timer: null });
+  const searching = useRef(false);
+  const moved = useRef(onMoved);
+  moved.current = onMoved;
+
+  // Depois de duas falhas seguidas, procura a lâmpada na rede (o IP pode ter mudado).
+  const search = useCallback(() => {
+    if (searching.current) return;
+    searching.current = true;
+    findBulb(connect, device).then(
+      (found) => (found ? moved.current(found) : (searching.current = false)),
+      () => (searching.current = false),
+    );
+  }, [device]);
 
   // Lê o estado; se falhar, tenta de novo sozinho com espera crescente até conseguir.
   const refresh = useCallback(() => {
@@ -101,10 +121,11 @@ function Control({ device, update, onUpdate, onEdit }: ControlProps) {
       (e: Error) => {
         setError(e.message);
         if (AppState.currentState !== 'active') return;
+        if (r.attempt === 1) search();
         r.timer = setTimeout(refresh, RETRY_MS[Math.min(r.attempt++, RETRY_MS.length - 1)]);
       },
     );
-  }, [bulb]);
+  }, [bulb, search]);
 
   // Reinicia o ciclo: fecha a conexão velha (presa à rede anterior) e reconecta já.
   const reconnect = useCallback(() => {

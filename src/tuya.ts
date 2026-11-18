@@ -254,3 +254,48 @@ export const commands = {
     '24': hex4(hue) + hex4(saturation * 10) + hex4(Math.max(10, brightness * 10)),
   }),
 };
+
+const PROBE_MS = 700;
+const PROBE_BATCH = 32;
+
+// Porta 6668 aberta neste IP? (só abre e fecha o TCP)
+function probe(connect: Connect, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok: boolean) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(ok);
+    };
+    const timer = setTimeout(() => finish(false), PROBE_MS);
+    const socket = connect(host, PORT, () => finish(true));
+    socket.on('error', () => finish(false));
+    socket.on('close', () => finish(false));
+  });
+}
+
+// O roteador pode dar outro IP à lâmpada quando ela ou o Wi-Fi reiniciam.
+// Varre a mesma /24 do IP salvo e confirma pela chave (só a lâmpada certa responde).
+export async function findBulb(connect: Connect, device: Device): Promise<Device | null> {
+  const prefix = device.ip.split('.').slice(0, 3).join('.');
+  const hosts = Array.from({ length: 254 }, (_, i) => `${prefix}.${i + 1}`).filter((h) => h !== device.ip);
+  for (let i = 0; i < hosts.length; i += PROBE_BATCH) {
+    const batch = hosts.slice(i, i + PROBE_BATCH);
+    const open = await Promise.all(batch.map((h) => probe(connect, h)));
+    for (const ip of batch.filter((_, j) => open[j])) {
+      const candidate = { ...device, ip };
+      const bulb = new Bulb(connect, candidate);
+      try {
+        await bulb.getState();
+        return candidate;
+      } catch {
+        // outro aparelho Tuya ou chave diferente
+      } finally {
+        bulb.close();
+      }
+    }
+  }
+  return null;
+}
