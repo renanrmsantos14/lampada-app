@@ -136,8 +136,9 @@ export class Bulb {
       socket.on('data', (chunk) => current() && this.onData(chunk));
       socket.on('error', (e) => {
         clearTimeout(timer);
-        reject(new Error(`Sem conexão com a lâmpada: ${e.message}`));
-        if (current()) this.close(new Error(`Conexão perdida: ${e.message}`));
+        const msg = e?.message || String(e ?? 'erro de rede');
+        reject(new Error(`Sem conexão com a lâmpada: ${msg}`));
+        if (current()) this.close(new Error(`Conexão perdida: ${msg}`));
       });
       socket.on('close', () => {
         clearTimeout(timer);
