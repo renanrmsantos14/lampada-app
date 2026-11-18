@@ -1,3 +1,4 @@
+import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -12,6 +13,7 @@ import { Bulb, commands, type BulbState, type Device } from './src/tuya';
 import { useUpdater, type Release } from './src/updater';
 
 const THROTTLE_MS = 120;
+const RETRY_MS = [1000, 2000, 4000, 8000, 15000]; // espera entre tentativas automáticas
 
 type Scene = { name: string; state: Pick<BulbState, 'brightness'> & Partial<BulbState> };
 const SCENES: Scene[] = [
@@ -83,26 +85,57 @@ function Control({ device, update, onUpdate, onEdit }: ControlProps) {
   const pending = useRef<Record<string, unknown> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const retry = useRef<{ attempt: number; timer: ReturnType<typeof setTimeout> | null }>({ attempt: 0, timer: null });
+
+  // Lê o estado; se falhar, tenta de novo sozinho com espera crescente até conseguir.
   const refresh = useCallback(() => {
+    const r = retry.current;
+    if (r.timer) clearTimeout(r.timer);
+    r.timer = null;
     bulb.getState().then(
       (s) => {
+        r.attempt = 0;
         setState(s);
         setError('');
       },
-      (e: Error) => setError(e.message),
+      (e: Error) => {
+        setError(e.message);
+        if (AppState.currentState !== 'active') return;
+        r.timer = setTimeout(refresh, RETRY_MS[Math.min(r.attempt++, RETRY_MS.length - 1)]);
+      },
     );
   }, [bulb]);
+
+  // Reinicia o ciclo: fecha a conexão velha (presa à rede anterior) e reconecta já.
+  const reconnect = useCallback(() => {
+    retry.current.attempt = 0;
+    bulb.close();
+    refresh();
+  }, [bulb, refresh]);
 
   useEffect(() => {
     refresh();
     // Em segundo plano a conexão fecha (bateria); ao voltar, reconecta e atualiza.
-    const sub = AppState.addEventListener('change', (s) => (s === 'active' ? refresh() : bulb.close()));
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') return reconnect();
+      if (retry.current.timer) clearTimeout(retry.current.timer);
+      bulb.close();
+    });
+    // Wi-Fi caiu/voltou ou trocou de rede: o socket antigo morre em silêncio, então reconecta na hora.
+    let lastNet = '';
+    const unsubNet = NetInfo.addEventListener((n) => {
+      const key = `${n.type}:${n.isConnected}:${(n.details as { ipAddress?: string } | null)?.ipAddress ?? ''}`;
+      if (lastNet && key !== lastNet && AppState.currentState === 'active') reconnect();
+      lastNet = key;
+    });
     return () => {
       sub.remove();
+      unsubNet();
       if (timer.current) clearTimeout(timer.current);
+      if (retry.current.timer) clearTimeout(retry.current.timer);
       bulb.close();
     };
-  }, [bulb, refresh]);
+  }, [bulb, refresh, reconnect]);
 
   // Envia no máximo um comando a cada THROTTLE_MS, sempre com o valor mais recente.
   const flush = useCallback(() => {
@@ -130,7 +163,7 @@ function Control({ device, update, onUpdate, onEdit }: ControlProps) {
       <View>
         <Text style={styles.title}>Lâmpada</Text>
         <Text style={[styles.subtitle, !!error && styles.error]} numberOfLines={2}>
-          {error || (state ? 'Conectada no Wi-Fi' : 'Conectando…')}
+          {error ? `${error} · reconectando…` : state ? 'Conectada no Wi-Fi' : 'Conectando…'}
         </Text>
       </View>
       <Pressable onPress={onEdit} hitSlop={12} accessibilityRole="button" style={styles.settings}>
@@ -153,7 +186,7 @@ function Control({ device, update, onUpdate, onEdit }: ControlProps) {
         {banner}
         {!!error && (
           <View style={styles.retry}>
-            <Pill label="Tentar de novo" onPress={refresh} />
+            <Pill label="Tentar de novo" onPress={reconnect} />
           </View>
         )}
       </View>

@@ -24,6 +24,7 @@ export type BulbState = {
 
 const PORT = 6668;
 const TIMEOUT_MS = 3000;
+const CONNECT_TIMEOUT_MS = 4000;
 const HEARTBEAT_MS = 10000;
 const CMD_CONTROL = 7;
 const CMD_HEARTBEAT = 9;
@@ -115,17 +116,34 @@ export class Bulb {
     const ready: Promise<Socket> = new Promise((resolve, reject) => {
       // Eventos de um socket antigo (já substituído) são ignorados.
       const current = () => this.ready === ready;
+      // Sem resposta do TCP (Wi-Fi caiu, IP errado), desiste em vez de esperar para sempre.
+      const timer = setTimeout(() => {
+        const err = new Error('Lâmpada não encontrada na rede (confira o Wi-Fi e o IP)');
+        reject(err);
+        socket.destroy();
+        if (current()) this.close(err);
+      }, CONNECT_TIMEOUT_MS);
       const socket = this.connect(this.device.ip, PORT, () => {
+        clearTimeout(timer);
+        if (!current()) {
+          socket.destroy();
+          return reject(new Error('Conexão fechada'));
+        }
         this.socket = socket;
-        this.heartbeat = setInterval(() => this.send(CMD_HEARTBEAT, {}).catch(() => {}), HEARTBEAT_MS);
+        this.heartbeat = setInterval(() => this.sendOnce(CMD_HEARTBEAT, {}).catch(() => {}), HEARTBEAT_MS);
         resolve(socket);
       });
       socket.on('data', (chunk) => current() && this.onData(chunk));
       socket.on('error', (e) => {
+        clearTimeout(timer);
         reject(new Error(`Sem conexão com a lâmpada: ${e.message}`));
         if (current()) this.close(new Error(`Conexão perdida: ${e.message}`));
       });
-      socket.on('close', () => current() && this.close(new Error('Conexão encerrada pela lâmpada')));
+      socket.on('close', () => {
+        clearTimeout(timer);
+        reject(new Error('Conexão encerrada pela lâmpada'));
+        if (current()) this.close(new Error('Conexão encerrada pela lâmpada'));
+      });
     });
     this.ready = ready;
     return ready;
@@ -151,7 +169,18 @@ export class Bulb {
     }
   }
 
+  // Todos os comandos são idempotentes (valores absolutos): se a conexão caiu
+  // (Wi-Fi trocou, lâmpada reiniciou), reabre e tenta mais uma vez.
   async send(cmd: number, body: object): Promise<object | null> {
+    try {
+      return await this.sendOnce(cmd, body);
+    } catch {
+      this.close(new Error('Reconectando'));
+      return this.sendOnce(cmd, body);
+    }
+  }
+
+  private async sendOnce(cmd: number, body: object): Promise<object | null> {
     const socket = await this.open();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
