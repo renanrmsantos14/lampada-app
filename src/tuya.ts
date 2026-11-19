@@ -28,6 +28,7 @@ const TIMEOUT_MS = 3000;
 const CONNECT_TIMEOUT_MS = 4000;
 const HEARTBEAT_MS = 10000;
 const CMD_CONTROL = 7;
+const CMD_STATUS = 8; // a lâmpada avisa sozinha quando muda (interruptor, outro app)
 const CMD_HEARTBEAT = 9;
 const CMD_QUERY = 10;
 const PREFIX = 0x000055aa;
@@ -79,7 +80,9 @@ export function decodeFrame(device: Device, buf: Uint8Array): Frame | null {
   const size = 16 + view.getUint32(12);
   if (buf.length < size) return null;
 
-  let payload = buf.subarray(20, size - 8); // pula código de retorno (4 bytes)
+  // Respostas trazem um código de retorno (4 bytes, quase todo zero); avisos de status não.
+  const hasRetcode = (view.getUint32(16) & 0xffffff00) === 0;
+  let payload = buf.subarray(hasRetcode ? 20 : 16, size - 8);
   if (payload[0] === 0x33 && payload[1] === 0x2e && payload[2] === 0x33) payload = payload.subarray(15);
   if (payload.length === 0 || payload.length % 16 !== 0) return { cmd: view.getUint32(8), data: null, size };
 
@@ -103,6 +106,9 @@ export class Bulb {
   private buf = new Uint8Array(0);
   private pending: Pending[] = [];
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private dps: Record<string, unknown> = {}; // último estado conhecido (avisos trazem só o que mudou)
+  /** Chamado quando a lâmpada muda por fora do app. */
+  onStatus: ((state: BulbState) => void) | null = null;
 
   private connect: Connect;
   private device: Device;
@@ -159,6 +165,11 @@ export class Bulb {
     try {
       for (let frame = decodeFrame(this.device, this.buf); frame; frame = decodeFrame(this.device, this.buf)) {
         this.buf = this.buf.subarray(frame.size);
+        const dps = (frame.data as { dps?: Record<string, unknown> } | null)?.dps;
+        if (frame.cmd === CMD_STATUS && dps) {
+          this.dps = { ...this.dps, ...dps };
+          this.onStatus?.(parseState(this.dps));
+        }
         const i = this.pending.findIndex((p) => p.cmd === frame!.cmd);
         if (i >= 0) {
           const [p] = this.pending.splice(i, 1);
@@ -214,12 +225,14 @@ export class Bulb {
       dps?: Record<string, unknown>;
     } | null;
     if (!res?.dps) throw new Error('Resposta sem estado da lâmpada');
-    return parseState(res.dps);
+    this.dps = { ...this.dps, ...res.dps };
+    return parseState(this.dps);
   }
 
   async set(dps: Record<string, unknown>): Promise<void> {
     const id = this.device.id;
     await this.send(CMD_CONTROL, { devId: id, uid: id, t: now(), dps });
+    this.dps = { ...this.dps, ...dps };
   }
 }
 

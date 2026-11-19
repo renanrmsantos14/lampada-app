@@ -3,7 +3,7 @@ import { ActivityIndicator, BackHandler, Linking, Pressable, StyleSheet, Text, T
 import { BUILD } from './build-info';
 import { connect } from './connect';
 import { saveDevice } from './device-store';
-import { colors, radius } from './theme';
+import { radius, themed, useColors } from './theme';
 import { Bulb, findBulb, type Device } from './tuya';
 import { REPO, type Release, type UpdateState } from './updater';
 
@@ -19,6 +19,7 @@ type Props = {
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
 export function Settings({ initial, onSaved, onBack, update, onCheck, onInstall }: Props) {
+  const styles = useStyles();
   const [form, setForm] = useState<Device>(initial ?? { id: '', ip: '', key: '' });
   const [error, setError] = useState('');
   const [testing, setTesting] = useState(false);
@@ -96,6 +97,7 @@ export function Settings({ initial, onSaved, onBack, update, onCheck, onInstall 
 }
 
 function UpdateStatus({ update }: { update: UpdateState }) {
+  const styles = useStyles();
   const text = {
     idle: '',
     checking: 'Procurando…',
@@ -114,6 +116,7 @@ function UpdateStatus({ update }: { update: UpdateState }) {
 }
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -124,6 +127,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 }
 
 function Field({ label, ...input }: { label: string } & ComponentProps<typeof TextInput>) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -133,6 +138,7 @@ function Field({ label, ...input }: { label: string } & ComponentProps<typeof Te
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <Text style={styles.label}>{label}</Text>
@@ -142,6 +148,8 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function Button({ label, onPress, busy, primary }: { label: string; onPress: () => void; busy?: boolean; primary?: boolean }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -150,7 +158,7 @@ function Button({ label, onPress, busy, primary }: { label: string; onPress: () 
       style={({ pressed }) => [styles.button, primary && styles.primary, (pressed || busy) && styles.dim]}
     >
       {busy ? (
-        <ActivityIndicator color={primary ? '#FFFFFF' : colors.text} />
+        <ActivityIndicator color={primary ? colors.inverse : colors.text} />
       ) : (
         <Text style={[styles.buttonText, primary && styles.primaryText]}>{label}</Text>
       )}
@@ -158,25 +166,34 @@ function Button({ label, onPress, busy, primary }: { label: string; onPress: () 
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: 20 },
-  header: { gap: 8 },
-  back: { color: colors.muted, fontSize: 16 },
-  title: { color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
-  section: { backgroundColor: colors.surface, borderRadius: radius.card, padding: 20, gap: 14 },
-  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  hint: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: -6 },
-  field: { gap: 6 },
-  label: { color: colors.muted, fontSize: 14 },
-  input: { backgroundColor: colors.bg, color: colors.text, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  rowValue: { color: colors.text, fontSize: 15, fontWeight: '500' },
-  status: { color: colors.text, fontSize: 14, lineHeight: 20 },
-  error: { color: colors.error, fontSize: 14 },
-  button: { borderRadius: radius.pill, paddingVertical: 15, alignItems: 'center', backgroundColor: colors.track },
-  primary: { backgroundColor: colors.text },
-  dim: { opacity: 0.6 },
-  buttonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  primaryText: { color: '#FFFFFF' },
-  link: { color: colors.muted, fontSize: 14, textAlign: 'center', textDecorationLine: 'underline' },
-});
+const useStyles = themed((colors) =>
+  StyleSheet.create({
+    wrap: { gap: 20 },
+    header: { gap: 8 },
+    back: { color: colors.muted, fontSize: 16 },
+    title: { color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
+    section: { backgroundColor: colors.surface, borderRadius: radius.card, padding: 20, gap: 14 },
+    sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+    hint: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: -6 },
+    field: { gap: 6 },
+    label: { color: colors.muted, fontSize: 14 },
+    input: {
+      backgroundColor: colors.bg,
+      color: colors.text,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+    },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    rowValue: { color: colors.text, fontSize: 15, fontWeight: '500' },
+    status: { color: colors.text, fontSize: 14, lineHeight: 20 },
+    error: { color: colors.error, fontSize: 14 },
+    button: { borderRadius: radius.pill, paddingVertical: 15, alignItems: 'center', backgroundColor: colors.track },
+    primary: { backgroundColor: colors.text },
+    dim: { opacity: 0.6 },
+    buttonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+    primaryText: { color: colors.inverse },
+    link: { color: colors.muted, fontSize: 14, textAlign: 'center', textDecorationLine: 'underline' },
+  }),
+);

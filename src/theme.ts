@@ -1,4 +1,6 @@
-export const colors = {
+import { useColorScheme } from 'react-native';
+
+const light = {
   bg: '#F6F5F2',
   surface: '#FFFFFF',
   track: '#EAE8E3',
@@ -6,7 +8,39 @@ export const colors = {
   text: '#16161A',
   muted: '#6E6E76',
   error: '#C2410C',
+  ok: '#15803D',
+  inverse: '#FFFFFF', // texto sobre fundo `text` (botões escuros no tema claro)
 };
+
+// Tema escuro para usar à noite sem ofuscar.
+const dark: typeof light = {
+  bg: '#111113',
+  surface: '#1C1C20',
+  track: '#2A2A2F',
+  line: '#2E2E34',
+  text: '#F4F4F5',
+  muted: '#A1A1AA',
+  error: '#FB923C',
+  ok: '#4ADE80',
+  inverse: '#111113',
+};
+
+export type Colors = typeof light;
+export const INK = light.text; // texto escuro fixo, para cima da cor da lâmpada
+
+export function useColors(): Colors {
+  return useColorScheme() === 'dark' ? dark : light;
+}
+
+// Estilos que dependem do tema, criados uma vez por tema.
+export function themed<T>(make: (c: Colors) => T): () => T {
+  const cache = new Map<Colors, T>();
+  return function useStyles() {
+    const c = useColors();
+    if (!cache.has(c)) cache.set(c, make(c));
+    return cache.get(c)!;
+  };
+}
 
 export const radius = { card: 24, bar: 18, pill: 999 };
 
@@ -27,13 +61,19 @@ const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 
 // Mistura duas cores #rrggbb (t de 0 a 1).
 export function mix(a: string, b: string, t: number): string {
   const [x, y] = [rgb(a), rgb(b)];
-  return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+  return `#${x
+    .map((v, i) =>
+      Math.round(v + (y[i] - v) * t)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 }
 
 // Texto escuro ou claro, o que tiver mais contraste com o fundo.
 export function textOn(hex: string): string {
   const [r, g, b] = rgb(hex);
-  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? colors.text : '#FFFFFF';
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? INK : '#FFFFFF';
 }
 
 export const WARM = '#FFB75E';

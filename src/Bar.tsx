@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
-import { colors, radius } from './theme';
+import { radius, themed } from './theme';
 
 type Props = {
   label: string;
@@ -20,6 +20,7 @@ type Props = {
 // Barra grossa de arrastar: toca para ir direto ao valor, arrasta para ajustar.
 export function Bar(props: Props) {
   const { label, value, min, max, display, fill, gradient } = props;
+  const styles = useStyles();
   const latest = useRef(props);
   latest.current = props;
   const width = useRef(1);
@@ -73,7 +74,12 @@ export function Bar(props: Props) {
       >
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {gradient ? (
-            <LinearGradient colors={gradient as [string, string, ...string[]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              colors={gradient as [string, string, ...string[]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+            />
           ) : (
             <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: fill }]} />
           )}
@@ -84,22 +90,24 @@ export function Bar(props: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: 10 },
-  labels: { flexDirection: 'row', justifyContent: 'space-between' },
-  label: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  value: { color: colors.muted, fontSize: 15, fontVariant: ['tabular-nums'] },
-  bar: { height: 56, borderRadius: radius.bar, backgroundColor: colors.track, overflow: 'hidden' },
-  fill: { position: 'absolute', left: 0, top: 0, bottom: 0 },
-  thumb: {
-    position: 'absolute',
-    top: 10,
-    bottom: 10,
-    width: 6,
-    marginLeft: -3,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.25)',
-  },
-});
+const useStyles = themed((colors) =>
+  StyleSheet.create({
+    wrap: { gap: 10 },
+    labels: { flexDirection: 'row', justifyContent: 'space-between' },
+    label: { color: colors.text, fontSize: 15, fontWeight: '600' },
+    value: { color: colors.muted, fontSize: 15, fontVariant: ['tabular-nums'] },
+    bar: { height: 56, borderRadius: radius.bar, backgroundColor: colors.track, overflow: 'hidden' },
+    fill: { position: 'absolute', left: 0, top: 0, bottom: 0 },
+    thumb: {
+      position: 'absolute',
+      top: 10,
+      bottom: 10,
+      width: 6,
+      marginLeft: -3,
+      borderRadius: 3,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: 'rgba(0,0,0,0.25)',
+    },
+  }),
+);
