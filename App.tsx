@@ -7,6 +7,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Bar } from './src/Bar';
 import { BUILD } from './src/build-info';
 import { connect } from './src/connect';
+import { listen } from './src/discover';
 import { loadDevice, loadState, saveDevice, saveState } from './src/device-store';
 import { Settings } from './src/Settings';
 import { HUE_STOPS, hsvToHex, radius, textOn, themed, useColors, whiteTone, WARM, COOL } from './src/theme';
@@ -124,6 +125,7 @@ function Control({ device, update, onUpdate, onEdit, onMoved }: ControlProps) {
   const retry = useRef<{ attempt: number; timer: ReturnType<typeof setTimeout> | null }>({ attempt: 0, timer: null });
   const searching = useRef(false);
   const wifi = useRef(true);
+  const online = useRef(false); // a última leitura deu certo
   const moved = useRef(onMoved);
   moved.current = onMoved;
 
@@ -149,7 +151,8 @@ function Control({ device, update, onUpdate, onEdit, onMoved }: ControlProps) {
       searching.current = false;
       setLink((l) => (l === 'searching' ? 'offline' : l));
     };
-    findBulb(connect, device).then((found) => (found ? moved.current(found) : done()), done);
+    // Achou no mesmo IP: a lâmpada só estava lenta, o ciclo de tentativas segue.
+    findBulb(connect, device, listen).then((found) => (found && found.ip !== device.ip ? moved.current(found) : done()), done);
   }, [device]);
 
   // Lê o estado; se falhar, tenta de novo sozinho com espera crescente até conseguir.
@@ -160,6 +163,7 @@ function Control({ device, update, onUpdate, onEdit, onMoved }: ControlProps) {
     bulb.getState().then(
       (s) => {
         r.attempt = 0;
+        online.current = true;
         setLink('online');
         remote(s);
       },
@@ -184,6 +188,15 @@ function Control({ device, update, onUpdate, onEdit, onMoved }: ControlProps) {
 
   useEffect(() => {
     bulb.onStatus = remote; // mudou pelo interruptor ou outro app: atualiza na hora
+    // A conexão morreu sozinha (o IP costuma mudar quando a lâmpada reinicia): relê já e, se
+    // falhar, procura, em vez de mostrar "Conectada" até o próximo toque. Só depois de uma
+    // leitura boa, para uma lâmpada que aceita e derruba a conexão não virar laço sem espera.
+    bulb.onLost = () => {
+      if (AppState.currentState !== 'active' || !online.current) return;
+      online.current = false;
+      setLink('connecting');
+      refresh();
+    };
     refresh();
     // Em segundo plano a conexão fecha (bateria); ao voltar, reconecta e atualiza.
     const sub = AppState.addEventListener('change', (s) => {
@@ -202,6 +215,7 @@ function Control({ device, update, onUpdate, onEdit, onMoved }: ControlProps) {
     });
     return () => {
       bulb.onStatus = null;
+      bulb.onLost = null;
       sub.remove();
       unsubNet();
       if (timer.current) clearTimeout(timer.current);
