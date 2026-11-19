@@ -11,7 +11,8 @@ export type Socket = {
   on(event: 'close', cb: () => void): unknown;
   destroy(): unknown;
 };
-export type Connect = (host: string, port: number, onConnect: () => void) => Socket;
+// timeoutMs: limite do connect nativo (a sonda da busca usa um curto).
+export type Connect = (host: string, port: number, onConnect: () => void, timeoutMs?: number) => Socket;
 
 export type BulbState = {
   on: boolean;
@@ -255,8 +256,11 @@ export const commands = {
   }),
 };
 
-const PROBE_MS = 700;
-const PROBE_BATCH = 32;
+// No Android o react-native-tcp-socket faz cada connect numa fila de só 2 threads e o
+// connect bloqueia até o timeout nativo. Por isso: timeout nativo curto, lotes pequenos e
+// o timer do JS só como rede de segurança (com folga para a fila).
+const PROBE_MS = 400;
+const PROBE_BATCH = 4;
 
 // Porta 6668 aberta neste IP? (só abre e fecha o TCP)
 function probe(connect: Connect, host: string): Promise<boolean> {
@@ -269,18 +273,23 @@ function probe(connect: Connect, host: string): Promise<boolean> {
       socket.destroy();
       resolve(ok);
     };
-    const timer = setTimeout(() => finish(false), PROBE_MS);
-    const socket = connect(host, PORT, () => finish(true));
+    const timer = setTimeout(() => finish(false), PROBE_MS * PROBE_BATCH);
+    const socket = connect(host, PORT, () => finish(true), PROBE_MS);
     socket.on('error', () => finish(false));
     socket.on('close', () => finish(false));
   });
 }
 
 // O roteador pode dar outro IP à lâmpada quando ela ou o Wi-Fi reiniciam.
-// Varre a mesma /24 do IP salvo e confirma pela chave (só a lâmpada certa responde).
+// Varre a mesma /24 do IP salvo, começando pelos vizinhos dele (o DHCP costuma dar um IP
+// próximo), e confirma pela chave (só a lâmpada certa responde).
 export async function findBulb(connect: Connect, device: Device): Promise<Device | null> {
   const prefix = device.ip.split('.').slice(0, 3).join('.');
-  const hosts = Array.from({ length: 254 }, (_, i) => `${prefix}.${i + 1}`).filter((h) => h !== device.ip);
+  const last = Number(device.ip.split('.')[3]);
+  const hosts = Array.from({ length: 254 }, (_, i) => i + 1)
+    .filter((n) => n !== last)
+    .sort((a, b) => Math.abs(a - last) - Math.abs(b - last))
+    .map((n) => `${prefix}.${n}`);
   for (let i = 0; i < hosts.length; i += PROBE_BATCH) {
     const batch = hosts.slice(i, i + PROBE_BATCH);
     const open = await Promise.all(batch.map((h) => probe(connect, h)));
