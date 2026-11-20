@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentProps, type ReactNode } from 'react'
 import { ActivityIndicator, BackHandler, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BUILD } from './build-info';
 import { connect } from './connect';
+import { listen } from './discover';
 import { saveDevice } from './device-store';
 import { radius, themed, useColors } from './theme';
 import { Bulb, findBulb, type Device } from './tuya';
@@ -45,7 +46,7 @@ export function Settings({ initial, onSaved, onBack, update, onCheck, onInstall 
     } catch (e) {
       // IP antigo? Procura a lâmpada na mesma rede antes de desistir.
       setError('Procurando a lâmpada na rede…');
-      const found = await findBulb(connect, form).catch(() => null);
+      const found = await findBulb(connect, form, listen).catch(() => null);
       if (found) {
         await saveDevice(found);
         onSaved(found);
