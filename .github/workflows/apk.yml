@@ -54,13 +54,13 @@ jobs:
           APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
           "$APKSIGNER" sign --ks "$RUNNER_TEMP/release.p12" --ks-type PKCS12 --ks-key-alias lampada \
             --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
-            --out "lampada-v${{ steps.ver.outputs.version }}.apk" android/app/build/outputs/apk/release/app-release.apk
-          "$APKSIGNER" verify "lampada-v${{ steps.ver.outputs.version }}.apk"
+            --out "renanlight-v${{ steps.ver.outputs.version }}.apk" android/app/build/outputs/apk/release/app-release.apk
+          "$APKSIGNER" verify "renanlight-v${{ steps.ver.outputs.version }}.apk"
           rm "$RUNNER_TEMP/release.p12"
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: Lâmpada v${{ steps.ver.outputs.version }} · ${{ steps.ver.outputs.date }}
+          name: RenanLight v${{ steps.ver.outputs.version }} · ${{ steps.ver.outputs.date }}
           body: APK gerado a partir de ${{ github.sha }}. Instale no Android e configure ID, IP e chave local na primeira abertura.
-          files: lampada-v${{ steps.ver.outputs.version }}.apk
+          files: renanlight-v${{ steps.ver.outputs.version }}.apk
