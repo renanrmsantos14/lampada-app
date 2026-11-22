@@ -1,6 +1,6 @@
-# Lâmpada
+# RenanLight
 
-App Android open source (React Native + Expo) que controla lâmpadas Tuya, como as do app **Elgin Smart** e do **Smart Life**, **direto pelo Wi-Fi de casa**, sem nuvem e sem servidor.
+**RenanLight** é um app Android open source (React Native + Expo) que controla lâmpadas Tuya, como as do app **Elgin Smart** e do **Smart Life**, **direto pelo Wi-Fi de casa**, sem nuvem e sem servidor.
 
 - Liga e desliga, brilho, branco quente ou frio, cor e saturação
 - Conexão TCP persistente com a lâmpada (protocolo local Tuya **3.3**): cerca de 40 a 200 ms por comando

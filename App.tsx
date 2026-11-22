@@ -251,7 +251,7 @@ function Control({ device, update, onUpdate, onEdit, onMoved }: ControlProps) {
   const header = (
     <View style={styles.header}>
       <View style={styles.headerText}>
-        <Text style={styles.title}>Lâmpada</Text>
+        <Text style={styles.title}>RenanLight</Text>
         <View style={styles.status} accessibilityLiveRegion="polite">
           <View style={[styles.dot, { backgroundColor: link === 'online' ? colors.ok : bad ? colors.error : colors.muted }]} />
           <Text style={[styles.subtitle, bad && styles.error]}>{LINK_TEXT[link]}</Text>

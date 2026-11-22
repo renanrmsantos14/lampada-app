@@ -54,7 +54,7 @@ export function useUpdater() {
     try {
       const dir = new Directory(Paths.cache, 'updates');
       dir.create({ idempotent: true, intermediates: true });
-      const apk = await File.downloadFileAsync(release.url, new File(dir, `lampada-${release.version}.apk`), {
+      const apk = await File.downloadFileAsync(release.url, new File(dir, `renanlight-${release.version}.apk`), {
         idempotent: true,
         onProgress: ({ bytesWritten, totalBytes }) =>
           totalBytes > 0 && setState({ status: 'downloading', release, progress: bytesWritten / totalBytes }),

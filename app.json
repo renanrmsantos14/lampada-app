@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Lâmpada",
-    "slug": "lampada-app",
+    "name": "RenanLight",
+    "slug": "renanlight",
     "version": "0.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
